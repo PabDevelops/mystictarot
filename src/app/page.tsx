@@ -365,7 +365,7 @@ export default function TarotApp() {
 
   const AFFILIATE_BOOKS = [
     { titleEN: "The Classic Tarot Deck", titleES: "El Mazo Clásico de Tarot", url: "https://amzn.to/4gPXOsU", emoji: "🃏" },
-    { titleEN: "Tarot: The Complete Guide", titleES: "Tarot: La Guía Completa", url: "https://www.amazon.com/s?k=tarot+guide+book&tag=mystictarot-21", emoji: "📖" },
+    { titleEN: "Tarot: The Complete Guide", titleES: "Tarot: La Guía Completa", url: "https://amzn.to/4begj6D", emoji: "📖" },
     { titleEN: "The Mystic Journal", titleES: "El Diario Místico", url: "https://amzn.to/4b0AO6M", emoji: "📓" },
   ];
 
