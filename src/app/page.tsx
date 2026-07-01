@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 
 import Image from "next/image";
+import Link from "next/link";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -371,6 +372,13 @@ export default function TarotApp() {
   return (
     <div className="h-[100dvh] md:h-screen bg-[#0a0a0f] text-slate-100 flex flex-col md:flex-row overflow-hidden font-sans relative">
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-mystic-900/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+
+      {/* Legal Footer */}
+      <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[300] flex gap-4 text-[10px] text-slate-600 hover:text-slate-500 transition-colors">
+        <Link href="/privacy" className="hover:text-mystic-400 transition-colors">Privacidad</Link>
+        <span>·</span>
+        <Link href="/terms" className="hover:text-mystic-400 transition-colors">Términos</Link>
+      </div>
 
       <AnimatePresence mode="wait">
         {onboardingStep < 3 && (
