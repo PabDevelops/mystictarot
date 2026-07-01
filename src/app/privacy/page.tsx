@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const content = {
+type Bullet = { label?: string; text: string; link?: { label: string; url: string } };
+type Section = { heading: string; body?: string; intro?: string; bullets?: Bullet[] };
+type LangContent = { title: string; updated: string; back: string; sections: Section[]; footerLinks: { label: string; href: string }[] };
+
+const content: Record<"EN" | "ES", LangContent> = {
   EN: {
     title: "Privacy Policy",
     updated: "Last updated: July 1, 2025",
