@@ -170,6 +170,11 @@ export default function TarotApp() {
   const [isMobile, setIsMobile] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
+
+  // Credits & Paywall
+  const [credits, setCredits] = useState(3);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
   
   // Onboarding Wizard State
   const [onboardingStep, setOnboardingStep] = useState(0); // 0: Welcome, 1: Intent, 2: Ready, 3: Main App
@@ -180,6 +185,38 @@ export default function TarotApp() {
   useEffect(() => {
     const savedLang = localStorage.getItem("tarotLanguage");
     if (savedLang) setLanguage(savedLang);
+
+    // Initialize credits with daily reset
+    const stored = JSON.parse(localStorage.getItem('tarotCredits') || '{}');
+    const today = new Date().toDateString();
+    if (stored.date !== today) {
+      const fresh = { credits: 3, date: today };
+      localStorage.setItem('tarotCredits', JSON.stringify(fresh));
+      setCredits(3);
+    } else {
+      setCredits(stored.credits ?? 3);
+    }
+
+    // Verify Stripe payment on redirect back
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') === 'true') {
+      const sessionId = params.get('session_id');
+      if (sessionId) {
+        fetch(`/api/verify-payment?session_id=${sessionId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              const current = JSON.parse(localStorage.getItem('tarotCredits') || '{}');
+              const newCredits = (current.credits ?? 0) + (data.credits ?? 5);
+              const updated = { ...current, credits: newCredits };
+              localStorage.setItem('tarotCredits', JSON.stringify(updated));
+              setCredits(newCredits);
+            }
+          })
+          .catch(() => {});
+      }
+      window.history.replaceState({}, '', '/');
+    }
   }, []);
 
   const handleLanguageChange = (lang: string) => {
@@ -263,7 +300,37 @@ export default function TarotApp() {
     }, 700);
   };
 
+  const spendCredit = (): boolean => {
+    const stored = JSON.parse(localStorage.getItem('tarotCredits') || '{}');
+    if ((stored.credits ?? 0) <= 0) return false;
+    const updated = { ...stored, credits: stored.credits - 1 };
+    localStorage.setItem('tarotCredits', JSON.stringify(updated));
+    setCredits(updated.credits);
+    return true;
+  };
+
+  const handleBuyCredits = async () => {
+    setIsPurchasing(true);
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale: language === 'ES' ? 'es' : 'en' }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      alert('Error al conectar con el sistema de pago.');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   const getReading = async () => {
+    if (!spendCredit()) {
+      setShowPaywall(true);
+      return;
+    }
     setIsReading(true);
     setReadingResult("");
     setDisplayedResult("");
@@ -294,6 +361,12 @@ export default function TarotApp() {
   const handleResetToWizard = () => {
     setOnboardingStep(0);
   };
+
+  const AFFILIATE_BOOKS = [
+    { titleEN: "The Classic Tarot Deck", titleES: "El Mazo Clásico de Tarot", url: "https://www.amazon.com/s?k=tarot+deck&tag=mystictarot-21", emoji: "🃏" },
+    { titleEN: "Tarot: The Complete Guide", titleES: "Tarot: La Guía Completa", url: "https://www.amazon.com/s?k=tarot+guide+book&tag=mystictarot-21", emoji: "📖" },
+    { titleEN: "The Mystic Journal", titleES: "El Diario Místico", url: "https://www.amazon.com/s?k=mystic+journal+spiritual&tag=mystictarot-21", emoji: "📓" },
+  ];
 
   return (
     <div className="h-[100dvh] md:h-screen bg-[#0a0a0f] text-slate-100 flex flex-col md:flex-row overflow-hidden font-sans relative">
@@ -378,6 +451,11 @@ export default function TarotApp() {
       >
         {/* Top Right Controls */}
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-3">
+          {/* Credits Badge */}
+          <div className={`px-3 py-2 rounded-full text-xs font-bold border backdrop-blur-md flex items-center gap-1 min-h-[44px] ${credits <= 1 ? 'bg-red-900/50 border-red-500/50 text-red-300' : 'bg-slate-900/50 border-slate-700/50 text-slate-300'}`}>
+            <span>✨</span>
+            <span>{credits}</span>
+          </div>
           {/* Shuffle Button */}
           <button
             onClick={handleShuffle}
@@ -702,6 +780,82 @@ export default function TarotApp() {
                   </div>
                 </motion.div>
               )}
+
+              {/* Affiliate Links */}
+              {!isReading && displayedResult.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-white/5">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest text-center mb-3">
+                    {language === 'ES' ? 'Profundiza tu camino' : 'Deepen your path'}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {AFFILIATE_BOOKS.map((book, i) => (
+                      <a
+                        key={i}
+                        href={book.url}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/50 border border-white/5 hover:border-mystic-500/30 hover:bg-slate-800 transition-all text-xs text-slate-400 hover:text-white group"
+                      >
+                        <span className="text-lg">{book.emoji}</span>
+                        <span className="leading-tight group-hover:text-mystic-300 transition-colors">
+                          {language === 'ES' ? book.titleES : book.titleEN}
+                        </span>
+                        <svg className="ml-auto w-3 h-3 opacity-40 group-hover:opacity-100 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Paywall Modal */}
+      <AnimatePresence>
+        {showPaywall && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl"
+            onClick={() => setShowPaywall(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 20, stiffness: 120 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-gradient-to-b from-[#13111C] to-[#08080c] border border-mystic-500/50 p-8 sm:p-12 rounded-3xl shadow-[0_0_80px_rgba(139,92,246,0.4)] max-w-md w-full text-center relative"
+            >
+              <div className="text-6xl mb-4 animate-bounce">✨</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-mystic-400 to-neon-accent mb-3">
+                {language === 'ES' ? 'Has agotado tus tiradas' : 'You\'ve used all your readings'}
+              </h2>
+              <p className="text-slate-400 text-sm mb-2">
+                {language === 'ES'
+                  ? 'Las fuerzas cósmicas se renuevan cada día. Vuelve mañana para 3 tiradas gratuitas, o desbloquea 5 lecturas ahora.'
+                  : 'The cosmic forces renew each day. Come back tomorrow for 3 free readings, or unlock 5 now.'}
+              </p>
+              <p className="text-mystic-400 font-bold text-lg mb-8">
+                {language === 'ES' ? '5 tiradas por solo €0.99' : '5 readings for just €0.99'}
+              </p>
+              <button
+                onClick={handleBuyCredits}
+                disabled={isPurchasing}
+                className="w-full py-4 bg-gradient-to-r from-mystic-600 to-neon-accent text-white font-bold tracking-widest uppercase rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(139,92,246,0.5)] disabled:opacity-60 disabled:pointer-events-none mb-3 min-h-[44px]"
+              >
+                {isPurchasing
+                  ? (language === 'ES' ? 'Redirigiendo...' : 'Redirecting...')
+                  : (language === 'ES' ? '🔮 Desbloquear 5 Tiradas — €0.99' : '🔮 Unlock 5 Readings — €0.99')}
+              </button>
+              <button
+                onClick={() => setShowPaywall(false)}
+                className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+              >
+                {language === 'ES' ? 'Volver mañana' : 'Come back tomorrow'}
+              </button>
             </motion.div>
           </motion.div>
         )}
